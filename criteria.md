@@ -42,59 +42,43 @@ Given a query that matches no listings, the agent stops before calling
 
 ---
 
-## 3. Something about state
+## 3. Outfits don't repeat a category
 
-<!-- YOU WRITE THIS ONE.
+Given a query that matches at least one listing, the outfit `suggest_outfit`
+returns never pairs two items from the same category — except tops, which may
+layer — in 5 of 5 tries.
 
-     How would you know that the item your search found is the same item the
-     next tool received? Name something countable or observable.
-
-     This is the criterion people find hardest, because state failure doesn't
-     look like state failure — it looks like a tool problem. Something that
-     compares session["selected_item"] against what actually reached
-     suggest_outfit is the shape you're after. -->
-
-
-
-**Why this target:**
-
-
+**Why this target:** This is close to common sense: pairing two bottoms, two
+pairs of shoes, or two outerwear pieces in one outfit doesn't make sense, so
+it should hold every single time, not most of the time. Tops are the one
+exception, since layering two tops (a tank under a cropped hoodie, say) is
+normal styling advice, not a mistake — so the rule only applies to bottoms,
+shoes, outerwear, and accessories.
 
 ---
 
-## 4. Something about the fit card
+## 4. The fit card always shows the price
 
-<!-- YOU WRITE THIS ONE.
+Given a query that matches at least one listing, the price of the new item
+appears in the `create_fit_card` output, in 5 of 5 tries.
 
-     The fit card calls a model, so the same input can produce different words
-     each time. That's not a bug — it's the nature of the tool. So what would
-     make it acceptable?
-
-     Think about what you'd actually be unhappy to see. A caption that never
-     mentions the price? Two different items producing the same opening
-     sentence? A card longer than a caption anyone would post? Any of those can
-     be turned into a number. -->
-
-
-
-**Why this target:**
-
-
+**Why this target:** The price is a requirement of the software, not an
+optional nicety — a fit card that leaves it out failed at its job, so this
+should hold every time rather than most of the time.
 
 ---
 
-## 5. Your choice
+## 5. The full run stays under 5 seconds
 
-<!-- YOU WRITE THIS ONE TOO.
+A full run of all three tools (`search_listings`, `suggest_outfit`,
+`create_fit_card`) completes in under 5 seconds, in 5 of 5 tries.
 
-     Pick something you actually care about getting right. Speed, the empty
-     wardrobe path, what happens when the model can't be reached, whether the
-     search respects a price ceiling — anything, as long as it names a number
-     or an observable outcome. -->
-
-
-
-**Why this target:**
+**Why this target:** Five seconds is roughly the max a user should have to
+wait for an outfit suggestion before it stops feeling responsive. I'm keeping
+5 of 5 for now, though I know this target could end up too strict —
+`generate.py` deliberately pauses to respect rate limits, and that pacing
+could push a run past 5 seconds for a reason that has nothing to do with the
+agent itself being slow.
 
 
 
