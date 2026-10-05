@@ -59,24 +59,24 @@
 
 ### `search_listings`
 
-- **What it does:**
-- **Inputs:** <!-- name and type each: `max_price` (float), not "a price" -->
-- **Returns:**
-- **When it has nothing:**
+- **What it does:** Searches the 40 listings in `data/listings.json` for items matching a free-text description, optionally filtered by size and a price ceiling, and returns the best matches ranked by keyword overlap.
+- **Inputs:** `description` (str, required) — keywords like `"vintage graphic tee"`. `size` (str, optional, default `None`) — matched by splitting the listing's `size` field on non-alphanumeric characters (`"S/M"` → tokens `{"s", "m"}`) and checking the query size is one of the tokens, case-insensitive — so `"M"` matches `"S/M"` but not `"US 9"` or `"XL"`. `max_price` (float, optional, default `None`) — inclusive ceiling.
+- **Returns:** A list of matching listing dicts, best match first, capped at `config.SEARCH_RESULT_LIMIT`. Each dict has `id, title, description, category, style_tags (list), size, condition, price (float), colors (list), brand (str or None), platform`.
+- **When it has nothing:** Returns `[]` — an empty list, never `None` and never an exception. This is what the loop branches on.
 
 ### `suggest_outfit`
 
-- **What it does:**
-- **Inputs:**
-- **Returns:**
-- **When it has nothing:**
+- **What it does:** Calls the model to suggest one or two outfit pairings between a thrifted item and the pieces already in the user's wardrobe.
+- **Inputs:** `new_item` (dict, required) — a listing dict, typically `session["selected_item"]`. `wardrobe` (dict, required) — a wardrobe dict with an `items` key holding a list of wardrobe-item dicts (`id, name, category, colors, style_tags, notes`); `items` may be `[]`.
+- **Returns:** A non-empty string describing one or two outfit combinations, naming specific wardrobe pieces by name when the wardrobe is non-empty.
+- **When it has nothing:** When `wardrobe["items"]` is empty, returns general styling advice for the new item alone (not an empty string, not an exception) — this is the empty-wardrobe path unit 4 triggers on purpose.
 
 ### `create_fit_card`
 
-- **What it does:**
-- **Inputs:**
-- **Returns:**
-- **When it has nothing:**
+- **What it does:** Calls the model to write a short, postable caption for the thrifted find, using the outfit suggestion as context.
+- **Inputs:** `outfit` (str, required) — the string returned by `suggest_outfit`. `new_item` (dict, required) — the listing dict for the item.
+- **Returns:** A two-to-four sentence caption that mentions the item, its price, and its platform exactly once each, and varies wording across different inputs (not word-for-word identical runs — see `CACHE_ENABLED`/`TEMPERATURE` in `config.py`).
+- **When it has nothing:** If `outfit` is empty or whitespace-only, returns a descriptive message ("No outfit to post yet" style) instead of raising or calling the model.
 
 ---
 
@@ -93,13 +93,13 @@
      The grader checks your code against what you claim here, so the file and
      function have to be real. -->
 
-**Branch rule:**
+**Branch rule:** If `search_listings` returns an empty list, put a message in `session["error"]` naming what to change (e.g. loosen the price ceiling or size) and stop — do not call `suggest_outfit`. Otherwise, take the first result as `session["selected_item"]` and continue to `suggest_outfit`, then `create_fit_card`.
 
 **Where it lives:** `agent.py::run_agent`
 
-**How the query is parsed:** <!-- regex, string splitting, or asking the model — say which -->
+**How the query is parsed:** Regex. A price ceiling is pulled with a pattern matching `under $N` / `$N` (e.g. `r"\$(\d+(?:\.\d+)?)"`), a size token is pulled by checking the query against a fixed set of known size strings from the data, and whatever text remains after stripping both becomes `description`. No model call for parsing — it's cheap and deterministic, and the model budget is spent on `suggest_outfit` and `create_fit_card` instead.
 
-**What moves through the session:** <!-- which fields, in what order -->
+**What moves through the session:** `query` → parsed into `parsed` (`description`, `size`, `max_price`) → fed to `search_listings`, whose output fills `search_results` → the first item becomes `selected_item` → `selected_item` + `wardrobe` go to `suggest_outfit`, filling `outfit_suggestion` → `outfit_suggestion` + `selected_item` go to `create_fit_card`, filling `fit_card`. `error` is set only on the empty-search branch, and when it's set every field after `search_results` stays `None`.
 
 ---
 
