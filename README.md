@@ -113,9 +113,37 @@
 **One full query**
 
 ```
-$ python app.py ask '...'
+$ python app.py ask 'vintage graphic tee under $30'
+
+  Found:    Y2K Baby Tee — Butterfly Print — $18.0 on depop
+
+  Outfit:   Pair the Y2K baby tee with your baggy straight-leg jeans and chunky white sneakers
+  to nail that nostalgic 2000s streetwear silhouette. Throw on your vintage black denim jacket
+  over top and sling your black crossbody bag across your chest to add an effortless edge that
+  grounds the pastel butterfly print. Alternatively, tuck the baby tee into your wide-leg khaki
+  trousers, secure it with the brown leather belt, and wear your chunky white sneakers for a
+  softer, earth-toned look.
+
+  Fit card: Manifesting ultimate 2000s pop star energy in this pastel butterfly Y2K baby tee!
+  Snagged it on Depop for just $18.00 and I am already living in it. Pair it with baggy jeans
+  and chunky sneakers for the absolute easiest nostalgic fit.
+
+  0 model calls this session, 2 served from cache
+```
+
+**The empty-search branch, proven by the call count**
 
 ```
+$ python app.py ask 'designer ballgown size XXS under $5'
+
+  No listings matched. Try raising the price ceiling, dropping the size filter, or using
+  broader keywords in your description.
+
+  0 model calls this session
+```
+
+Zero model calls on the empty path is the branch working — `suggest_outfit` and
+`create_fit_card` were never reached.
 
 **The three tools, tested one at a time**
 
