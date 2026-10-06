@@ -39,9 +39,14 @@
 
 ## What This Does
 
-<!-- Three or four sentences: what a user asks for, and what they get back. -->
-
-
+FitFindr takes a plain-language shopping query — what someone's looking for,
+optionally a size and a price ceiling — and searches a secondhand listings
+catalog for matches. When it finds one, it pulls in the user's existing
+wardrobe and asks the model to suggest an outfit pairing the new item with
+pieces they already own, then writes a short, postable caption for the find.
+If nothing in the catalog matches the query, it stops and tells the user
+what to change — a looser price ceiling, a different size, broader keywords
+— instead of guessing or crashing.
 
 ---
 
@@ -205,15 +210,29 @@ wash pair on Depop before someone else could!
 
 **Moment 1**
 
-- *What I asked for:*
-- *What came back:*
-- *What I changed:*
+- *What I asked for:* I drafted acceptance criterion 4 as "The model should
+  always show the price of the outfit after picking one" and asked Claude to
+  check it.
+- *What came back:* Claude pointed out "the outfit" doesn't have a price
+  field anywhere in the data — wardrobe items don't carry a price, only
+  listings do — so the sentence didn't say which number it meant, and it
+  couldn't test it without asking me first.
+- *What I changed:* Reworded it to "the agent lists the price for the new
+  item," and specified the check is against `create_fit_card`'s output
+  specifically, since that's the one tool whose job is to produce the thing
+  a person actually reads.
 
 **Moment 2**
 
-- *What I asked for:*
-- *What came back:*
-- *What I changed:*
+- *What I asked for:* My draft of criterion 3 was "never repeats a category
+  for each clothes in 5 out of 5 tries."
+- *What came back:* Claude asked whether layering two tops — a tank under a
+  cropped hoodie, say — should count as a violation, since a strict
+  same-category rule would mark normal, reasonable styling advice as a fail.
+- *What I changed:* Decided tops are the one exception; only bottoms, shoes,
+  outerwear, and accessories have to stay unique within one outfit. I hadn't
+  considered that my own rule would penalize a legitimate suggestion until it
+  was phrased back to me as a concrete case.
 
 <!-- ═══════════════════════ UNIT 4 — THE TEST ═══════════════════════
 
