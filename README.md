@@ -121,17 +121,47 @@ $ python app.py ask '...'
 
 ```
 $ python -c "from tools import search_listings; print(search_listings('graphic tee', max_price=30))"
-
+[{'id': 'lst_002', 'title': 'Y2K Baby Tee — Butterfly Print', 'price': 18.0, ...},
+ {'id': 'lst_006', 'title': 'Graphic Tee — 2003 Tour Bootleg Style', 'price': 24.0, ...},
+ {'id': 'lst_017', 'title': 'Mesh Long-Sleeve Top — Black', 'price': 15.0, ...},
+ {'id': 'lst_033', 'title': 'Vintage Band Tee — Faded Grey', 'price': 19.0, ...},
+ {'id': 'lst_011', 'title': 'Low-Rise Cargo Pants — Khaki', 'price': 27.0, ...},
+ {'id': 'lst_015', 'title': 'Vintage Graphic Hoodie — Faded Black', 'price': 26.0, ...}]
+(six matches, ranked by keyword overlap — full dicts truncated here for space)
 ```
 
 ```
-$ python -c "from tools import suggest_outfit; ..."
-
+$ python -c "from tools import suggest_outfit; from utils.data_loader import get_example_wardrobe, load_listings; print(suggest_outfit(load_listings()[0], get_example_wardrobe()))"
+Pair the medium wash Levi's 501s with your fitted white ribbed tank top and cinch the waist
+using your brown leather belt for a classic 90s silhouette. Finish this effortless daytime
+look by stepping into your chunky white sneakers and slinging your black crossbody bag over
+your shoulder. For a cooler day, layer your oversized grey crewneck sweatshirt over the top
+and swap the sneakers for your black combat boots to add a touch of grunge.
 ```
 
 ```
-$ python -c "from tools import create_fit_card; ..."
+$ python -c "from tools import create_fit_card; from utils.data_loader import load_listings; print(create_fit_card('jeans and white sneakers', load_listings()[0]))"
+Finally scored the holy grail of denim: vintage Levi's 501s with that perfectly broken-in
+medium wash. At just $38, these are about to become my daily uniform paired with crisp white
+sneakers. Snag them on my Depop before I change my mind and keep them forever!
+```
 
+Ran `create_fit_card` three times on the same item with `AI201_CACHE=0` to confirm it isn't
+just handing back a cached answer — three different captions came back, all mentioning the
+$38 price and Depop:
+
+```
+Nothing beats broken-in vintage Levi's 501s, especially when they already have that perfect
+medium wash. Just dropped these in my Depop shop for $38! Throw them on with crisp white
+sneakers and you're good to go.
+
+Nothing beats worn-in vintage Levi's 501s that fit like a glove right out of the gate. Tossed
+these on with crisp white sneakers and the casual look was instantly set. Grabbed them on
+Depop for just $38 and I'm never taking them off.
+
+Nothing beats real broken-in denim, especially when you score true vintage Levi's 501s for
+just $38. I'm living in these with crisp white sneakers all season long. Snagged this medium
+wash pair on Depop before someone else could!
 ```
 
 ---
