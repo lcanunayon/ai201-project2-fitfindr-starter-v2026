@@ -95,15 +95,17 @@ def new_session(query: str, wardrobe: dict) -> dict:
 
 # ── planning loop ─────────────────────────────────────────────────────────────
 
-def run_agent(query: str, wardrobe: dict) -> dict:
+def run_agent(query: str, wardrobe: dict, trace_enabled: bool = False) -> dict:
     """
     Run the loop once and return the finished session.
 
     Args:
-        query:    what the user asked for, in plain language
-                  (e.g. "vintage graphic tee under $30, size M").
-        wardrobe: a wardrobe dict — get_example_wardrobe() or
-                  get_empty_wardrobe() from utils/data_loader.py.
+        query:         what the user asked for, in plain language
+                       (e.g. "vintage graphic tee under $30, size M").
+        wardrobe:      a wardrobe dict — get_example_wardrobe() or
+                       get_empty_wardrobe() from utils/data_loader.py.
+        trace_enabled: when True, print each step via trace.step() as the
+                       loop runs. app.py sets this from --trace.
 
     Returns:
         The session dict. **Check session["error"] first** — if it isn't None,
@@ -151,12 +153,19 @@ def run_agent(query: str, wardrobe: dict) -> dict:
       • A handler for ModelUnavailable, so a bad key produces a message rather
         than a stack trace. The import is already at the top of this file.
     """
+    def _step(*args, **kwargs):
+        if trace_enabled:
+            trace.step(*args, **kwargs)
+
     session = new_session(query, wardrobe)
     iterations = 0
+    if trace_enabled:
+        trace.start_trace()
 
     iterations += 1
     trace.check_iterations(iterations)
     session["parsed"] = _parse_query(query)
+    _step("parse_query", inputs={"query": query}, returned=session["parsed"])
 
     iterations += 1
     trace.check_iterations(iterations)
@@ -165,6 +174,11 @@ def run_agent(query: str, wardrobe: dict) -> dict:
         "size": session["parsed"]["size"],
         "max_price": session["parsed"]["max_price"],
     })
+    _step(
+        "search_listings (via MCP)",
+        inputs=session["parsed"],
+        returned=session["search_results"],
+    )
 
     # THE BRANCH: nothing matched, so stop here rather than calling
     # suggest_outfit with nothing to work from.
@@ -173,20 +187,45 @@ def run_agent(query: str, wardrobe: dict) -> dict:
             "No listings matched. Try raising the price ceiling, dropping the "
             "size filter, or using broader keywords in your description."
         )
+        _step("branch", note="empty search_results — stopping before suggest_outfit")
         return session
 
     session["selected_item"] = session["search_results"][0]
 
     iterations += 1
     trace.check_iterations(iterations)
-    session["outfit_suggestion"] = suggest_outfit(
-        session["selected_item"], session["wardrobe"]
+    try:
+        session["outfit_suggestion"] = suggest_outfit(
+            session["selected_item"], session["wardrobe"]
+        )
+    except ModelUnavailable as exc:
+        session["error"] = str(exc)
+        _step(
+            "suggest_outfit",
+            inputs={"new_item": session["selected_item"]["title"]},
+            note="ModelUnavailable — stopping",
+        )
+        return session
+    _step(
+        "suggest_outfit",
+        inputs={"new_item": session["selected_item"]["title"]},
+        returned=session["outfit_suggestion"],
     )
 
     iterations += 1
     trace.check_iterations(iterations)
-    session["fit_card"] = create_fit_card(
-        session["outfit_suggestion"], session["selected_item"]
+    try:
+        session["fit_card"] = create_fit_card(
+            session["outfit_suggestion"], session["selected_item"]
+        )
+    except ModelUnavailable as exc:
+        session["error"] = str(exc)
+        _step("create_fit_card", note="ModelUnavailable — stopping")
+        return session
+    _step(
+        "create_fit_card",
+        inputs={"outfit": session["outfit_suggestion"][:40] + "…"},
+        returned=session["fit_card"],
     )
 
     return session

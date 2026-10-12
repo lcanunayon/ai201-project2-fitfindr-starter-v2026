@@ -316,14 +316,103 @@ that produced it:
 **Happy path**
 
 ```
+$ python app.py ask 'vintage graphic tee under $30' --trace
 
+[1] parse_query
+      in:  dict with keys: query
+      out: dict with keys: description, size, max_price
+[2] search_listings (via MCP)
+      in:  dict with keys: description, size, max_price
+      out: 10 items: Y2K Baby Tee — Butterfly Print, Graphic Tee — 2003 Tour Bootleg Style, Vintage Band Tee — Faded Grey … +7 more
+[3] suggest_outfit
+      in:  dict with keys: new_item
+      out: Pair the Y2K baby tee with your baggy straight-leg jeans and chunky white sneakers to nail that nostalgic 2000…
+[4] create_fit_card
+      in:  dict with keys: outfit
+      out: Manifesting ultimate 2000s pop star energy in this pastel butterfly Y2K baby tee! Snagged it on Depop for just…
+
+  Found:    Y2K Baby Tee — Butterfly Print — $18.0 on depop
+  Outfit:   Pair the Y2K baby tee with your baggy straight-leg jeans and chunky white sneakers...
+  Fit card: Manifesting ultimate 2000s pop star energy in this pastel butterfly Y2K baby tee!...
+
+0 model calls this session, 2 served from cache
 ```
 
 **Empty search**
 
 ```
+$ python app.py ask 'designer ballgown size XXS under $5' --trace
 
+[1] parse_query
+      in:  dict with keys: query
+      out: dict with keys: description, size, max_price
+[2] search_listings (via MCP)
+      in:  dict with keys: description, size, max_price
+      out: [] (empty)
+[3] branch
+      →    empty search_results — stopping before suggest_outfit
+
+  No listings matched. Try raising the price ceiling, dropping the size filter, or using
+  broader keywords in your description.
+
+0 model calls this session
 ```
+
+Three steps instead of four — it stops one step earlier than the happy path, which
+is the branch doing its job rather than just producing different-looking text.
+
+**The three failure modes, triggered on purpose**
+
+1. **Empty search** — `python app.py ask 'designer ballgown size XXS under $5'`.
+   Message: *"No listings matched. Try raising the price ceiling, dropping the
+   size filter, or using broader keywords in your description."* Already handled
+   correctly from Milestone 5 — no changes needed.
+
+2. **Empty wardrobe** — `python app.py ask 'vintage graphic tee under $30' --empty-wardrobe`.
+   Returns general styling advice (e.g. pairing the tee with a denim mini and
+   platform shoes) instead of crashing or returning an empty string. Already
+   handled correctly from Milestone 4 — no changes needed.
+
+3. **Model unavailable** — changed one character of `GEMINI_API_KEY` in `.env`,
+   then ran a fresh, never-asked query (`'90s track jacket in size M'`), confirmed
+   by `1 model calls this session` so it wasn't just a cache hit:
+
+   ```
+   $ python app.py ask '90s track jacket in size M' --trace
+
+   [1] parse_query
+         in:  dict with keys: query
+         out: dict with keys: description, size, max_price
+   [2] search_listings (via MCP)
+         in:  dict with keys: description, size, max_price
+         out: 4 items: 90s Track Jacket — Navy/White Stripe, 90s Leather Bomber — Black, ...
+   [3] suggest_outfit
+         in:  dict with keys: new_item
+         →    ModelUnavailable — stopping
+
+     The model rejected your API key. Check GEMINI_API_KEY in your .env file, or create a
+     fresh key at aistudio.google.com.
+
+   1 model calls this session
+   ```
+
+   Before a fix, this propagated as an uncaught `ModelUnavailable` all the way to
+   `app.py`'s top-level handler — not a raw stack trace (that handler already
+   catches `Exception` and prints `type(exc).__name__: exc`), but it exited the
+   whole process with `sys.exit(1)`, which would have killed an interactive
+   `ask` session after one bad query. Added a `try/except ModelUnavailable`
+   around both `suggest_outfit` and `create_fit_card` in `run_agent()` so the
+   failure now sets `session["error"]` and returns cleanly, the same pattern as
+   the empty-search branch, instead of raising past the loop. Put the real key
+   back in `.env` immediately after confirming this.
+
+**A bug the trace work surfaced:** adding `trace.step()` calls made the trace
+print on *every* run, not just ones passed `--trace` — `trace.py`'s `step()`
+prints unconditionally, so calling it inside `run_agent()` with no guard broke
+`app.py`'s documented "add `--trace` to print the loop" behavior. Fixed by
+adding a `trace_enabled: bool = False` parameter to `run_agent()`, threaded
+through from `app.py`'s `--trace` flag, and wrapping every `trace.step()` call
+in a local `_step()` helper that checks it first.
 
 **On the MCP move:** Moved `search_listings` onto MCP — registered it in
 `mcp_server.py` with a description and typed inputs written for a reader who
