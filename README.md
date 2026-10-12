@@ -263,7 +263,7 @@ since `run_eval.py` doesn't record per-try duration.
 | 2. Impossible query stops before tool 2 | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
 | 3. Outfit never repeats a non-top category | 5 of 5 | FAIL | FAIL | FAIL | FAIL | FAIL | MISSED (0/5) |
 | 4. Fit card always shows the price | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
-| 5. Full run stays under 5 seconds | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 5. Full run stays under 5 seconds | 5 of 5 | FAIL | PASS | FAIL | PASS | PASS | ~~MET~~ MISSED (3/5) — see correction below |
 
 **Criterion 1** — `agent.py::run_agent`, scenario `matching query completes`,
 query `vintage graphic tee under $30`, try 1:
@@ -323,7 +323,7 @@ for $45 over on Poshmark and it's the ultimate throw-on-and-go piece. Throw it o
 ribbed tank, baggy denim, and chunky sneakers for the easiest off-duty streetwear fit.
 ```
 
-**Criterion 5** — timed separately with `time.monotonic()` around
+**Criterion 5** — originally timed separately with `time.monotonic()` around
 `agent.py::run_agent`, query `denim jacket under $50`, `AI201_CACHE=0`:
 
 ```
@@ -333,6 +333,44 @@ try 3: 2.11s, error=None
 try 4: 2.11s, error=None
 try 5: 2.21s, error=None
 ```
+
+**Correction, caught during Milestone 4's "argue the opposite" check:** the
+numbers above are real, but they're not the real *test* — they come from a
+clean, isolated rerun with no other model calls competing for quota. The
+canonical evidence is `python run_eval.py --label before`, the one actual
+batch run this criterion's five tries belong to, and that run's real console
+output (not saved into the `.md` report — rate-limit lines print to stderr,
+outside what `run_once()` records) shows this for the `full run stays under
+budget` scenario:
+
+```
+full run stays under budget  (example wardrobe)
+  query: denim jacket under $50
+[2] search_listings (via MCP) ...
+  [rate limit] 15 requests used this minute. Waiting 3s. This is normal.
+[3] suggest_outfit ...
+  try 1: completed — fit card 257 chars
+[2] search_listings (via MCP) ...
+[3] suggest_outfit ...
+[4] create_fit_card ...
+  try 2: completed — fit card 241 chars
+[2] search_listings (via MCP) ...
+[3] suggest_outfit ...
+  [rate limit] 15 requests used this minute. Waiting 39s. This is normal.
+[4] create_fit_card ...
+  try 3: completed — fit card 246 chars
+  try 4: completed — fit card 263 chars    (no rate-limit line)
+  try 5: completed — fit card 249 chars    (no rate-limit line)
+```
+
+By the time this scenario runs, the batch has already made roughly 40 model
+calls across the four scenarios before it, so the per-minute cap is
+genuinely in effect — try 1 waited 3s and try 3 waited 39s, on top of the
+~2-3.7s of real processing time measured above. Added together, try 1 lands
+right at or just past 5 seconds and try 3 lands around 41 seconds — both
+real FAILs against the 5-second target. Try 2, 4, and 5 show no rate-limit
+line and match the clean timing, so they stand as real PASSes. Corrected
+tally: **3 of 5, MISSED** — not the 5/5 MET I first wrote down.
 
 ---
 
@@ -356,14 +394,61 @@ try 5: 2.21s, error=None
 
 | # | Criterion | Target | Verdict | How I decided |
 |---|---|---|---|---|
-| 1 |  |  |  |  |
-| 2 |  |  |  |  |
-| 3 |  |  |  |  |
-| 4 |  |  |  |  |
-| 5 |  |  |  |  |
+| 1 | Matching query completes all three tools | 4 of 5 | MET (5/5) | All 5 tries of `vintage graphic tee under $30` ran all three tools and returned a non-empty `fit_card`. Argued the opposite: all 5 tries used the *same* query, so this really only tests reliability on one fixed search path, not across different phrasings — a real limitation of the test, not of the verdict as the criterion is literally worded. |
+| 2 | Impossible query stops before tool 2 | 5 of 5 | MET (5/5) | All 5 tries of `designer ballgown size XXS under $5` returned `search_results: 0`, `error` set, `fit_card` still `None`, 0 model calls. Same single-query caveat as criterion 1 applies, but the verdict holds against the wording as written. |
+| 3 | Outfit never repeats a non-top category | 5 of 5 | MISSED (0/5) | All 5 tries paired the new item — a slip dress, `category: bottoms` — with the wardrobe's jeans (also `category: bottoms`) in at least one of the two outfit options `suggest_outfit` offered. Argued the opposite — that dress-over-pants is legitimate styling, not a real "repeat" — but the criterion as I wrote it carves out only tops, not dresses; the literal rule is violated every time. Verdict stands. |
+| 4 | Fit card always shows the price | 5 of 5 | MET (5/5) | All 5 tries of `90s track jacket in size M` mention `$45` or `$45.00` in `create_fit_card`'s output. Same single-item caveat as criteria 1/2. |
+| 5 | Full run stays under 5 seconds | 5 of 5 | MISSED (3/5) | See the correction above the table break — the real tally from the canonical `run_eval.py` batch is 3 PASS / 2 FAIL, not the 5/5 my first, isolated timing run showed. |
 
 **Diagnoses**
 
+**Criterion 3 — the tool, specifically its prompt and the data it's handed.**
+Missed 5 of 5, and all five share one mechanism, not five different ones.
+The test item — a slip dress — is tagged `category: bottoms` in
+`data/listings.json` (checked directly via `load_listings()`), the same
+category the example wardrobe's jeans use. `tools.py::suggest_outfit`'s
+prompt never mentions category uniqueness at all — it just asks the model
+for "one or two complete outfits" — so the model does exactly what a real
+stylist would do: layer the dress over the jeans. That reads as good advice
+to a person and as two same-category items to my literal rule. This isn't a
+branch or session problem — `selected_item` and `wardrobe` flowed into
+`suggest_outfit` exactly as designed, and the tool returned a normal,
+well-formed string. The miss is that the prompt was never given the
+constraint the criterion checks for, compounded by a category taxonomy
+that's coarser than the criterion assumed (one "bottoms" bucket covers both
+pants and a dress meant to be worn as an overlay).
+
+**Criterion 5 — not cleanly a tool, branch, session, or model-output
+problem; the shared rate limiter.** Missed 3 of 5 once corrected. The two
+failing tries (1 and 3) didn't fail because any tool ran slowly —
+`search_listings`, `suggest_outfit`, and `create_fit_card` all returned in
+roughly the same 2-3.7 seconds they take in isolation. They failed because
+`generate.py`'s rate limiter, shared across the entire `run_eval.py`
+session, paused those two specific calls for 3s and 39s respectively, once
+the batch had already made roughly 40 model calls across the four scenarios
+ahead of this one in `scenarios.py`'s list order. I flagged this exact risk
+in `criteria.md` itself when I set the target — "this pacing could push a
+run past 5 seconds for a reason that has nothing to do with the agent
+itself being slow" — so it wasn't a surprise once it happened; I just
+hadn't applied that caveat honestly until re-checking the verdict here
+instead of keeping the cleaner, isolated numbers.
+
+**The pattern.** Both misses are single-mechanism misses, not several
+separate bugs wearing different faces: criterion 3's five failures all
+trace to one cause (the dress's category tag plus an unconstrained prompt),
+and criterion 5's two failures both trace to one cause (shared rate-limit
+pacing kicking in late in a long batch).
+
+**On the three MET criteria.** None of them was a free pass exactly, but
+none was rigorously tested either — criteria 1, 2, and 4 each ran the same
+single query or item five times. `search_listings` is deterministic, so
+five identical inputs will always produce five identical search results;
+what actually varied across tries was only the model's wording. If I were
+tightening one criterion for the next round, I'd pick **criterion 1** and
+require five *different* matching queries instead of one query run five
+times — that's the gap the "argue the opposite" read exposed most clearly,
+and it's the criterion most likely to have been hiding a real search bug
+behind a lucky, repeated input.
 
 
 ---
