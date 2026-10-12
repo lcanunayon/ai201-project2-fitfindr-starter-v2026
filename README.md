@@ -234,6 +234,40 @@ wash pair on Depop before someone else could!
   considered that my own rule would penalize a legitimate suggestion until it
   was phrased back to me as a concrete case.
 
+**Moment 3 (Unit 4)**
+
+- *What I asked for:* Following the brief's self-check, I asked Claude to
+  argue against my own "MET (5/5)" verdict for criterion 5 as strongly as it
+  could, using my five timed tries.
+- *What came back:* Claude pointed out that my five tries came from a
+  clean, isolated rerun that never competed with other calls for
+  rate-limit quota — but the real canonical evidence, the one actual
+  `run_eval.py --label before` batch my other four criteria's tries came
+  from, showed two genuine "[rate limit] ... Waiting 3s / Waiting 39s"
+  pauses on this exact scenario, which I had in the console output but
+  hadn't applied to the verdict.
+- *What I changed:* Corrected the Milestone 3 run log for criterion 5 from
+  MET (5/5) to MISSED (3/5) before writing the Milestone 4 diagnosis,
+  rather than keeping the more flattering, isolated number. The real
+  mechanism — shared rate-limit pacing, not a slow tool — became the
+  actual diagnosis.
+
+**Moment 4 (Unit 4)**
+
+- *What I asked for:* I asked Claude to add `trace.step()` calls to
+  `run_agent()` for Milestone 2.
+- *What came back:* The first version printed the trace on every single
+  `ask`, not just ones passed `--trace` — because `trace.py`'s `step()`
+  prints unconditionally with no gate of its own, and nothing in
+  `run_agent()` checked whether tracing had actually been requested. Claude
+  caught this itself by comparing the output against `app.py`'s own
+  documented behavior ("Add `--trace` to print the loop step by step")
+  before I'd even run it myself.
+- *What I changed:* Had Claude thread a `trace_enabled` flag through
+  `run_agent()`, defaulting to `True` so `run_eval.py`'s existing two-arg
+  call (which relies on getting a trace back) kept working, with `app.py`
+  passing the flag explicitly either way.
+
 <!-- ═══════════════════════ UNIT 4 — THE TEST ═══════════════════════
 
      Don't fill these in during unit 3.
@@ -671,6 +705,35 @@ unchanged, as expected — the fix didn't touch any code they exercise.
      you did. "I ran out of time" is fine if it's true. Pretending nothing is
      left is not. -->
 
+**Criterion 5 — full run under 5 seconds — still MISSED (4 of 5 after the
+fix, up from 3 of 5, but neither hits the 5/5 target).**
+
+What I'd do: the real fix is reducing model calls per run, not chasing the
+rate limiter. Right now a full run makes two model calls (`suggest_outfit`
+and `create_fit_card`), each paced independently by `generate.py`'s shared
+per-minute budget. Merging them into a single call — one prompt that asks
+for both the outfit suggestion and the caption in one response, then
+splitting the result in code — would cut the model-call count in half,
+which directly reduces how often any given run lands inside a rate-limited
+window. A smaller structural change in the same direction: running
+`suggest_outfit` and `create_fit_card` isn't actually sequential-dependent
+in a way that requires two separate round trips if the prompt is designed
+right, so this is a real, scoped option, not a vague "make it faster."
+
+Why I stopped there: Milestone 5 asked for *one* change, measured properly,
+specifically so I could tell what did what. Combining two tools' prompts is
+a bigger, riskier change than rewriting one system instruction — it would
+touch `create_fit_card`'s contract too, and conflating it with the
+criterion-3 fix would have made it impossible to tell which change caused
+which result in the after-run. I chose to land one clean, verified win
+instead of two unverified ones. The merge is the next thing I'd try, in its
+own milestone, measured on its own.
+
+What I will *not* do: lower the 5-second target to whatever the rate
+limiter happens to allow. That's exactly the "turned out to be more
+realistic" move the brief calls out as not earning credit — the criterion
+is fine and measurable as written; I just haven't fixed the mechanism
+behind the miss yet.
 
 
 <!-- ═════════════════════════════════════════════════════════════════════
