@@ -325,12 +325,34 @@ that produced it:
 
 ```
 
-**On the MCP move:** <!-- what changed in your code, and whether anything
-behaved differently afterwards. If the rewire didn't work, say exactly where it
-broke — the error text and the last thing that worked. That earns the point in
-full. -->
+**On the MCP move:** Moved `search_listings` onto MCP — registered it in
+`mcp_server.py` with a description and typed inputs written for a reader who
+can't see `tools.py`, then in `agent.py::run_agent` swapped the direct call
 
+```python
+session["search_results"] = search_listings(
+    session["parsed"]["description"], size=..., max_price=...,
+)
+```
 
+for
+
+```python
+session["search_results"] = call_tool("search_listings", {
+    "description": session["parsed"]["description"],
+    "size": session["parsed"]["size"],
+    "max_price": session["parsed"]["max_price"],
+})
+```
+
+Nothing behaved differently afterward. `python app.py ask 'vintage graphic tee
+under $30'` produced the identical item, outfit, and fit card as the pre-MCP
+run; `python app.py ask 'designer ballgown size XXS under $5'` still stopped
+with the same message and 0 model calls. Checked the types explicitly too —
+`session["search_results"]` came back as `list`, and `session["search_results"][0]`
+and `session["selected_item"]` as `dict`, not strings — so `mcp_client.call_tool`'s
+unwrapping is doing what it claims: the call changes shape, the return value
+doesn't.
 
 ---
 
