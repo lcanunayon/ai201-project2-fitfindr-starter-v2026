@@ -95,7 +95,7 @@ def new_session(query: str, wardrobe: dict) -> dict:
 
 # ── planning loop ─────────────────────────────────────────────────────────────
 
-def run_agent(query: str, wardrobe: dict, trace_enabled: bool = False) -> dict:
+def run_agent(query: str, wardrobe: dict, trace_enabled: bool = True) -> dict:
     """
     Run the loop once and return the finished session.
 
@@ -104,8 +104,12 @@ def run_agent(query: str, wardrobe: dict, trace_enabled: bool = False) -> dict:
                        (e.g. "vintage graphic tee under $30, size M").
         wardrobe:      a wardrobe dict — get_example_wardrobe() or
                        get_empty_wardrobe() from utils/data_loader.py.
-        trace_enabled: when True, print each step via trace.step() as the
-                       loop runs. app.py sets this from --trace.
+        trace_enabled: when True (the default), print each step via
+                       trace.step() as the loop runs — run_eval.py relies on
+                       this default so it gets a trace back without having
+                       to know about this parameter. app.py passes it
+                       explicitly from --trace, so a plain `ask` without
+                       --trace stays quiet.
 
     Returns:
         The session dict. **Check session["error"] first** — if it isn't None,
@@ -252,12 +256,14 @@ if __name__ == "__main__":
     _show(run_agent(
         query="looking for a vintage graphic tee under $30",
         wardrobe=get_example_wardrobe(),
+        trace_enabled=False,
     ))
 
     print("\n=== A query it can't ===")
     _show(run_agent(
         query="designer ballgown size XXS under $5",
         wardrobe=get_example_wardrobe(),
+        trace_enabled=False,
     ))
 
     print(
