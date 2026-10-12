@@ -35,18 +35,32 @@ SCENARIOS = [
         "wardrobe": "empty",
         "criterion": None,
     },
-    # TODO: add what your criteria 3, 4 and 5 need.
-    #
-    # Set "criterion" to the number in criteria.md that the scenario tests.
-    # "criterion": None means a diagnostic run — useful to have, but it isn't
-    # one of your five, and run_eval.py marks it as such in the table.
-    #
-    # For a state criterion, any normal query works — what you're checking is
-    # what ends up in the session, not what the user typed.
-    #
-    # For a fit-card criterion, you probably want the SAME query listed more
-    # than once, or several different items, depending on what your criterion
-    # actually says.
+    {
+        # Criterion 3: outfit never repeats a non-top category. Any matching
+        # query works — what's checked is the outfit text, not the query.
+        "name": "outfit has no repeated category",
+        "query": "silk slip dress in midi length under $40",
+        "wardrobe": "example",
+        "criterion": 3,
+    },
+    {
+        # Criterion 4: the fit card always names the item's price. Any
+        # matching query works — what's checked is create_fit_card's output.
+        "name": "fit card shows the price",
+        "query": "90s track jacket in size M",
+        "wardrobe": "example",
+        "criterion": 4,
+    },
+    {
+        # Criterion 5: full run under 5 seconds. run_eval.py doesn't record
+        # timing per try, so this scenario only confirms the run completes
+        # five times — the actual latency numbers come from a separate,
+        # timed run pasted into the README alongside this one.
+        "name": "full run stays under budget",
+        "query": "denim jacket under $50",
+        "wardrobe": "example",
+        "criterion": 5,
+    },
 ]
 
 WARDROBES = ("example", "empty")

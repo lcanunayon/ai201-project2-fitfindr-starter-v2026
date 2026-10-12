@@ -252,19 +252,86 @@ wash pair on Depop before someone else could!
      `python run_eval.py --label before` runs everything and writes the table
      into results/. Paste it here and fill in the verdicts. -->
 
+Produced by `python run_eval.py --label before` — full output in
+`results/run_2026-10-11_2213_before.md`. Scenarios: `scenarios.py`; loop:
+`agent.py::run_agent`; timing for criterion 5 measured separately (see below)
+since `run_eval.py` doesn't record per-try duration.
+
 | Criterion | Target | Try 1 | Try 2 | Try 3 | Try 4 | Try 5 | Verdict |
 |---|---|---|---|---|---|---|---|
-| 1.  |  |  |  |  |  |  |  |
-| 2.  |  |  |  |  |  |  |  |
-| 3.  |  |  |  |  |  |  |  |
-| 4.  |  |  |  |  |  |  |  |
-| 5.  |  |  |  |  |  |  |  |
+| 1. Matching query completes all three tools | 4 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 2. Impossible query stops before tool 2 | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 3. Outfit never repeats a non-top category | 5 of 5 | FAIL | FAIL | FAIL | FAIL | FAIL | MISSED (0/5) |
+| 4. Fit card always shows the price | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 5. Full run stays under 5 seconds | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
 
-**Real output from one try**, pasted as text, naming the file and function
-that produced it:
+**Criterion 1** — `agent.py::run_agent`, scenario `matching query completes`,
+query `vintage graphic tee under $30`, try 1:
 
 ```
+selected_item: Y2K Baby Tee — Butterfly Print ($18.0, depop)
 
+Outfit suggestion:
+Pair the butterfly baby tee with your baggy straight-leg dark wash jeans and chunky white
+sneakers to nail that Y2K street style proportion play. Throw your black cropped zip hoodie
+loosely over your shoulders and finish the look with your black crossbody bag.
+
+Fit card:
+Finally scored the ultimate Y2K butterfly baby tee for just $18 on Depop! I'm living for this
+print and can't wait to style it with baggy dark-wash denim and chunky white sneakers. Grab it
+on my page before I change my mind and keep it for myself!
+```
+
+**Criterion 2** — `agent.py::run_agent`, scenario `impossible query stops early`,
+query `designer ballgown size XXS under $5`, try 1:
+
+```
+stopped early: yes — No listings matched. Try raising the price ceiling, dropping the size
+filter, or using broader keywords in your description.
+selected_item: (none)
+search_results: 0
+```
+
+**Criterion 3** — `tools.py::suggest_outfit`, scenario `outfit has no repeated category`,
+query `silk slip dress in midi length under $40`, try 1 — **FAIL**:
+
+```
+selected_item: 90s Silk Slip Dress — Floral, Midi Length ($30.0, depop)  [category: bottoms]
+
+Outfit suggestion:
+Layer the floral slip dress right over your baggy straight-leg jeans and white ribbed tank top
+for an effortless 90s indie sleaze look. Ground the outfit by pulling on your black combat
+boots and throwing the vintage black denim jacket over your shoulders. ...
+```
+
+The new item itself — the slip dress — is tagged `category: bottoms` in the data (checked via
+`load_listings()`), the same category as "baggy straight-leg jeans" in the example wardrobe
+(also `bottoms`). The model consistently (5 of 5 tries) suggests layering the dress over the
+jeans — a real, intentional styling move — but under my criterion's literal
+same-non-top-category rule, dress + jeans is a repeat every time. All 5 tries failed for this
+same reason.
+
+**Criterion 4** — `tools.py::create_fit_card`, scenario `fit card shows the price`,
+query `90s track jacket in size M`, try 1:
+
+```
+selected_item: 90s Track Jacket — Navy/White Stripe ($45.0, poshmark)
+
+Fit card:
+Pulled this crispy 90s navy and white stripe track jacket and I am obsessed! Just scored it
+for $45 over on Poshmark and it's the ultimate throw-on-and-go piece. Throw it on with a white
+ribbed tank, baggy denim, and chunky sneakers for the easiest off-duty streetwear fit.
+```
+
+**Criterion 5** — timed separately with `time.monotonic()` around
+`agent.py::run_agent`, query `denim jacket under $50`, `AI201_CACHE=0`:
+
+```
+try 1: 3.68s, error=None
+try 2: 2.36s, error=None
+try 3: 2.11s, error=None
+try 4: 2.11s, error=None
+try 5: 2.21s, error=None
 ```
 
 ---
