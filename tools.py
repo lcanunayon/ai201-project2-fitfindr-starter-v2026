@@ -186,7 +186,11 @@ def suggest_outfit(new_item: dict, wardrobe: dict) -> str:
 
     system = (
         "You are a thrifting stylist. Give concrete, specific outfit advice in "
-        "two to four sentences. Name actual pieces, not generic categories."
+        "two to four sentences. Name actual pieces, not generic categories. "
+        "Within a single outfit option, never pair two pieces from the same "
+        "category (tops, bottoms, outerwear, shoes, accessories) — except "
+        "tops, which may be layered together. If you suggest more than one "
+        "outfit option, apply this rule separately within each option."
     )
     return generate(prompt, system=system)
 

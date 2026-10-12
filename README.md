@@ -604,25 +604,63 @@ doesn't.
 
      `python run_eval.py --label after` -->
 
-**What I changed:**
+**What I changed:** Rewrote the `system` instruction in
+`tools.py::suggest_outfit` to explicitly state the category-uniqueness rule:
+"Within a single outfit option, never pair two pieces from the same
+category (tops, bottoms, outerwear, shoes, accessories) — except tops,
+which may be layered together. If you suggest more than one outfit option,
+apply this rule separately within each option." Nothing else changed — not
+`search_listings`, not `create_fit_card`, not the branch in `run_agent`.
 
-**Which failure it was meant to fix:**
+**Which failure it was meant to fix:** Criterion 3's diagnosis — the model
+was never told about the category rule, so it reasonably suggested layering
+the slip dress (`category: bottoms`) over the wardrobe's jeans
+(`category: bottoms`), which reads as good styling to a person and as a
+same-category repeat under my rule. This is a prompt-rewrite fix, not a tool
+or branch fix — nothing about `suggest_outfit`'s inputs, outputs, or control
+flow was broken.
 
 ### Run Log — After
 
+Produced by `python run_eval.py --label after` — full output in
+`results/run_2026-10-11_2225_after.md`.
+
 | Criterion | Target | Try 1 | Try 2 | Try 3 | Try 4 | Try 5 | Verdict |
 |---|---|---|---|---|---|---|---|
-| 1.  |  |  |  |  |  |  |  |
-| 2.  |  |  |  |  |  |  |  |
-| 3.  |  |  |  |  |  |  |  |
-| 4.  |  |  |  |  |  |  |  |
-| 5.  |  |  |  |  |  |  |  |
+| 1. Matching query completes all three tools | 4 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 2. Impossible query stops before tool 2 | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 3. Outfit never repeats a non-top category | 5 of 5 | PASS | PASS | PASS | PASS | PASS | **MET (5/5)** — up from MISSED (0/5) |
+| 4. Fit card always shows the price | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 5. Full run stays under 5 seconds | 5 of 5 | PASS | FAIL | PASS | PASS | PASS | MISSED (4/5) — up from (3/5), but not the targeted fix |
 
-**Did it help, and how do I know:**
+**Criterion 3, after — try 1** (`tools.py::suggest_outfit`, same scenario that
+failed 5/5 before):
 
-<!-- If it made things worse, say that. Honestly reported, that earns full
-     credit and is more interesting than one that worked. -->
+```
+Layer the floral midi dress directly over the white ribbed tank top, throw the oversized grey
+crewneck sweatshirt on top, and finish the look with the chunky white sneakers. Alternatively,
+wear the dress on its own paired with the vintage black denim jacket and ground the outfit
+using the black combat boots.
+```
 
+Dress (`bottoms`) + tank (`tops`) + sweatshirt (`tops`, layered — allowed) + sneakers
+(`shoes`); alternative: dress (`bottoms`) + denim jacket (`outerwear`) + boots (`shoes`). No
+non-top category repeats in either option — checked all 5 tries by hand against the wardrobe's
+categories, and all 5 came back clean the same way.
+
+**Did it help, and how do I know:** Yes, for the criterion it targeted —
+clean win, 0/5 to 5/5, verified against the exact scenario that failed
+before, not a different easier one. I know because I read all 5 outfit
+texts against the actual category data, the same way I diagnosed the
+failure, rather than trusting that a prompt change "probably" worked.
+Criterion 5 moved from 3/5 to 4/5 in this same run, but that's not evidence
+the fix helped it — `suggest_outfit`'s prompt has nothing to do with the
+rate limiter, and the single failing try (try 2, a 44s pacing wait) landed
+in a different position than before (try 2 instead of try 1 and try 3)
+purely because of where in the batch the wait happened to fall. Criterion 5
+is still MISSED, consistent with the diagnosis that its mechanism is shared
+infrastructure pacing, not anything in `tools.py`. Criteria 1, 2, and 4 are
+unchanged, as expected — the fix didn't touch any code they exercise.
 
 
 ---
